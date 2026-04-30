@@ -8,10 +8,23 @@ import '../models/app_models.dart';
 import '../models/role.dart';
 
 class AppState extends ChangeNotifier {
+  static const String _apiBaseUrlOverride = String.fromEnvironment('API_BASE_URL');
+  static const String _apiBaseUrlPrefKey = 'api_base_url';
+  String? _apiBaseUrlFromPrefs;
+
   static String get _apiBaseUrl {
+    // NOTE: this getter is kept static for call sites; actual resolved value is
+    // provided via `_resolvedApiBaseUrl` below.
+    if (_apiBaseUrlOverride.trim().isNotEmpty) return _apiBaseUrlOverride.trim();
     if (kIsWeb) return 'http://localhost:8000/api';
     if (defaultTargetPlatform == TargetPlatform.android) return 'http://10.0.2.2:8000/api';
     return 'http://localhost:8000/api';
+  }
+
+  String get resolvedApiBaseUrl {
+    final pref = _apiBaseUrlFromPrefs?.trim() ?? '';
+    if (pref.isNotEmpty) return pref;
+    return _apiBaseUrl;
   }
 
   final List<AppUser> _users = [];
@@ -25,15 +38,17 @@ class AppState extends ChangeNotifier {
   AppUser? currentUser;
   String? _accessToken;
   String? _refreshToken;
+  String? authError;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
+    _apiBaseUrlFromPrefs = prefs.getString(_apiBaseUrlPrefKey);
     _accessToken = prefs.getString('access_token');
     _refreshToken = prefs.getString('refresh_token');
     if (_accessToken != null && _accessToken!.isNotEmpty) {
       try {
         final meResponse = await http.get(
-          Uri.parse('$_apiBaseUrl/users/me/'),
+          Uri.parse('$resolvedApiBaseUrl/users/me/'),
           headers: _headers(auth: true),
         );
         if (meResponse.statusCode == 200) {
@@ -53,6 +68,21 @@ class AppState extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  Future<void> setApiBaseUrl(String value) async {
+    final normalized = value.trim().replaceAll(RegExp(r'/+$'), '');
+    final prefs = await SharedPreferences.getInstance();
+    if (normalized.isEmpty) {
+      _apiBaseUrlFromPrefs = null;
+      await prefs.remove(_apiBaseUrlPrefKey);
+    } else {
+      _apiBaseUrlFromPrefs = normalized;
+      await prefs.setString(_apiBaseUrlPrefKey, normalized);
+    }
+    notifyListeners();
+  }
+
+  Future<void> resetApiBaseUrlToDefault() => setApiBaseUrl('');
 
   List<AppUser> get doctors =>
       _users.where((u) => u.profile.role == UserRole.doctor).toList();
@@ -162,12 +192,20 @@ class AppState extends ChangeNotifier {
 
   Future<bool> login(String email, String password) async {
     try {
+      authError = null;
       final response = await http.post(
-        Uri.parse('$_apiBaseUrl/users/login/'),
+        Uri.parse('$resolvedApiBaseUrl/users/login/'),
         headers: _headers(),
         body: jsonEncode({'email': email.trim(), 'password': password.trim()}),
       );
-      if (response.statusCode != 200) return false;
+      if (response.statusCode != 200) {
+        if (response.statusCode == 401) {
+          authError = 'Invalid email or password';
+        } else {
+          authError = 'Login failed (${response.statusCode}). Check backend server.';
+        }
+        return false;
+      }
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       _accessToken = data['access']?.toString();
       _refreshToken = data['refresh']?.toString();
@@ -177,6 +215,7 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (_) {
+      authError = 'Unable to reach backend. Set API_BASE_URL and ensure server is running.';
       return false;
     }
   }
@@ -187,7 +226,7 @@ class AppState extends ChangeNotifier {
       _users.clear();
       if (currentUser?.profile.role == UserRole.admin) {
         final response = await http.get(
-          Uri.parse('$_apiBaseUrl/users/'),
+          Uri.parse('$resolvedApiBaseUrl/users/'),
           headers: _headers(auth: true),
         );
         if (response.statusCode == 200) {
@@ -196,7 +235,7 @@ class AppState extends ChangeNotifier {
         }
       }
       final doctorResponse = await http.get(
-        Uri.parse('$_apiBaseUrl/users/doctors/'),
+        Uri.parse('$resolvedApiBaseUrl/users/doctors/'),
         headers: _headers(auth: true),
       );
       if (doctorResponse.statusCode == 200) {
@@ -218,7 +257,7 @@ class AppState extends ChangeNotifier {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$_apiBaseUrl/users/password-reset/send-otp/'),
+        Uri.parse('$resolvedApiBaseUrl/users/password-reset/send-otp/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email.trim().toLowerCase()}),
       );
@@ -256,7 +295,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final response = await http.post(
-        Uri.parse('$_apiBaseUrl/users/password-reset/verify-otp/'),
+        Uri.parse('$resolvedApiBaseUrl/users/password-reset/verify-otp/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email.trim().toLowerCase(),
@@ -292,7 +331,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final response = await http.post(
-        Uri.parse('$_apiBaseUrl/users/password-reset/complete/'),
+        Uri.parse('$resolvedApiBaseUrl/users/password-reset/complete/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email.trim().toLowerCase(),
@@ -332,7 +371,7 @@ class AppState extends ChangeNotifier {
     final _ = profilePhotoBytes;
     try {
       final response = await http.post(
-        Uri.parse('$_apiBaseUrl/users/signup/'),
+        Uri.parse('$resolvedApiBaseUrl/users/signup/'),
         headers: _headers(),
         body: jsonEncode({
           'email': email.trim().toLowerCase(),
@@ -364,7 +403,7 @@ class AppState extends ChangeNotifier {
     try {
       if (_refreshToken != null) {
         await http.post(
-          Uri.parse('$_apiBaseUrl/users/logout/'),
+          Uri.parse('$resolvedApiBaseUrl/users/logout/'),
           headers: _headers(auth: true),
           body: jsonEncode({'refresh': _refreshToken}),
         );
@@ -391,7 +430,7 @@ class AppState extends ChangeNotifier {
   }) async {
     if (_accessToken == null) return;
     await http.post(
-      Uri.parse('$_apiBaseUrl/appointments/'),
+      Uri.parse('$resolvedApiBaseUrl/appointments/'),
       headers: _headers(auth: true),
       body: jsonEncode({
         'student_name': studentName,
@@ -406,7 +445,7 @@ class AppState extends ChangeNotifier {
   Future<void> acceptAppointment(Appointment appointment) async {
     if (appointment.id == null || _accessToken == null) return;
     await http.post(
-      Uri.parse('$_apiBaseUrl/appointments/${appointment.id}/accept/'),
+      Uri.parse('$resolvedApiBaseUrl/appointments/${appointment.id}/accept/'),
       headers: _headers(auth: true),
     );
     await fetchAppointments();
@@ -415,7 +454,7 @@ class AppState extends ChangeNotifier {
   Future<void> setAppointmentDeadline(Appointment appointment, DateTime deadline) async {
     if (appointment.id == null || _accessToken == null) return;
     await http.post(
-      Uri.parse('$_apiBaseUrl/appointments/${appointment.id}/set_deadline/'),
+      Uri.parse('$resolvedApiBaseUrl/appointments/${appointment.id}/set_deadline/'),
       headers: _headers(auth: true),
       body: jsonEncode({'deadline': deadline.toIso8601String()}),
     );
@@ -429,7 +468,7 @@ class AppState extends ChangeNotifier {
   }) async {
     if (_accessToken == null) return;
     await http.post(
-      Uri.parse('$_apiBaseUrl/diagnoses/'),
+      Uri.parse('$resolvedApiBaseUrl/diagnoses/'),
       headers: _headers(auth: true),
       body: jsonEncode({
         'student_name': studentName,
@@ -447,7 +486,7 @@ class AppState extends ChangeNotifier {
   }) async {
     if (_accessToken == null) return;
     await http.post(
-      Uri.parse('$_apiBaseUrl/reports/'),
+      Uri.parse('$resolvedApiBaseUrl/reports/'),
       headers: _headers(auth: true),
       body: jsonEncode({
         'student_name': studentName,
@@ -461,7 +500,7 @@ class AppState extends ChangeNotifier {
   Future<void> addMedicine(String name, int stock) async {
     if (_accessToken == null) return;
     await http.post(
-      Uri.parse('$_apiBaseUrl/medicines/add_stock/'),
+      Uri.parse('$resolvedApiBaseUrl/medicines/add_stock/'),
       headers: _headers(auth: true),
       body: jsonEncode({'name': name.trim(), 'stock': stock}),
     );
@@ -475,7 +514,7 @@ class AppState extends ChangeNotifier {
     if (_accessToken == null) return 'Please login first.';
     try {
       final response = await http.post(
-        Uri.parse('$_apiBaseUrl/medicines/issue/'),
+        Uri.parse('$resolvedApiBaseUrl/medicines/issue/'),
         headers: _headers(auth: true),
         body: jsonEncode({'name': name.trim(), 'qty': qty}),
       );
@@ -498,7 +537,7 @@ class AppState extends ChangeNotifier {
     if (_accessToken == null) return 'Please login first.';
     try {
       final response = await http.post(
-        Uri.parse('$_apiBaseUrl/medicine-requests/notify_admin/'),
+        Uri.parse('$resolvedApiBaseUrl/medicine-requests/notify_admin/'),
         headers: _headers(auth: true),
         body: jsonEncode({
           'medicine_name': medicineName.trim(),
@@ -521,7 +560,7 @@ class AppState extends ChangeNotifier {
     if (request.id == null || _accessToken == null) return;
     try {
       await http.post(
-        Uri.parse('$_apiBaseUrl/medicine-requests/${request.id}/provide/'),
+        Uri.parse('$resolvedApiBaseUrl/medicine-requests/${request.id}/provide/'),
         headers: _headers(auth: true),
       );
       await fetchMedicineRequests();
@@ -533,7 +572,7 @@ class AppState extends ChangeNotifier {
     if (_accessToken == null) return;
     try {
       final response = await http.get(
-        Uri.parse('$_apiBaseUrl/medicine-requests/'),
+        Uri.parse('$resolvedApiBaseUrl/medicine-requests/'),
         headers: _headers(auth: true),
       );
 
@@ -568,7 +607,7 @@ class AppState extends ChangeNotifier {
     if (_accessToken == null) return;
     try {
       final response = await http.get(
-        Uri.parse('$_apiBaseUrl/appointments/'),
+        Uri.parse('$resolvedApiBaseUrl/appointments/'),
         headers: _headers(auth: true),
       );
       if (response.statusCode == 200) {
@@ -585,7 +624,7 @@ class AppState extends ChangeNotifier {
     if (_accessToken == null) return;
     try {
       final response = await http.get(
-        Uri.parse('$_apiBaseUrl/diagnoses/'),
+        Uri.parse('$resolvedApiBaseUrl/diagnoses/'),
         headers: _headers(auth: true),
       );
       if (response.statusCode == 200) {
@@ -602,7 +641,7 @@ class AppState extends ChangeNotifier {
     if (_accessToken == null) return;
     try {
       final response = await http.get(
-        Uri.parse('$_apiBaseUrl/reports/'),
+        Uri.parse('$resolvedApiBaseUrl/reports/'),
         headers: _headers(auth: true),
       );
       if (response.statusCode == 200) {
@@ -619,7 +658,7 @@ class AppState extends ChangeNotifier {
     if (_accessToken == null) return;
     try {
       final response = await http.get(
-        Uri.parse('$_apiBaseUrl/medicines/'),
+        Uri.parse('$resolvedApiBaseUrl/medicines/'),
         headers: _headers(auth: true),
       );
       if (response.statusCode == 200) {

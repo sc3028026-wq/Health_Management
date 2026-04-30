@@ -16,12 +16,53 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _hide = true;
+  final _apiController = TextEditingController();
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _apiController.dispose();
     super.dispose();
+  }
+
+  Future<void> _showApiSettings() async {
+    final appState = context.read<AppState>();
+    _apiController.text = appState.resolvedApiBaseUrl;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Backend URL'),
+        content: TextField(
+          controller: _apiController,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(
+            hintText: 'http://192.168.1.50:8000/api',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await appState.resetApiBaseUrlToDefault();
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+            },
+            child: const Text('Reset'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await appState.setApiBaseUrl(_apiController.text);
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _submit() async {
@@ -31,8 +72,9 @@ class _LoginScreenState extends State<LoginScreen> {
           _passwordController.text.trim(),
         );
     if (!ok && mounted) {
+      final msg = context.read<AppState>().authError ?? 'Invalid email or password';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid email or password')),
+        SnackBar(content: Text(msg)),
       );
     }
   }
@@ -244,6 +286,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: IconButton(
+                          tooltip: 'Backend settings',
+                          onPressed: _showApiSettings,
+                          icon: const Icon(Icons.settings),
+                        ),
+                      ),
                       Container(
                         height: 58,
                         width: 58,

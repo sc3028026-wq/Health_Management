@@ -123,6 +123,7 @@ class _PharmacistDashboardState extends State<PharmacistDashboard> {
                     name: medicineName,
                     qty: qty,
                   );
+              if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
             },
             child: const Text('Issue Medicine'),
@@ -157,6 +158,7 @@ class _PharmacistDashboardState extends State<PharmacistDashboard> {
                     message: adminMessage,
                     requestedBy: pharmacistName,
                   );
+              if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
               if (msg.toLowerCase().contains('saved') ||
                   msg.toLowerCase().contains('successfully')) {

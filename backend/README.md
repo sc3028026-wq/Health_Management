@@ -15,14 +15,19 @@ Django REST API for Health Management System.
    python manage.py migrate
    ```
 
-3. Create superuser:
+3. Apply migrations (this also seeds demo users):
+   ```
+   python manage.py migrate
+   ```
+
+4. (Optional) Create your own superuser:
    ```
    python manage.py createsuperuser
    ```
 
-4. Run server:
+5. Run server:
    ```
-   python manage.py runserver
+   python manage.py runserver 0.0.0.0:8000
    ```
 
 ## API Endpoints
@@ -40,4 +45,9 @@ Uses JWT tokens. Login to get tokens, include in headers: `Authorization: Bearer
 
 ## Default Users
 
-Create users via signup or admin panel with roles: admin, doctor, student, pharmacist.
+On migrate, demo users are auto-created/updated:
+
+- Admin: `admin@gmail.com` / `Admin@123`
+- Doctor: `doctor@gmail.com` / `Doctor@123`
+- Student: `student@gmail.com` / `Student@123`
+- Pharmacist: `pharma@gmail.com` / `Pharma@123`

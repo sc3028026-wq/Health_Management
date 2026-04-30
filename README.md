@@ -1,17 +1,45 @@
-# CampusCare
+# CampusCare (Health Management)
 
-CampusCare health management app.
+Flutter app + Django REST backend for role-based dashboards:
+**Admin**, **Doctor**, **Student**, **Pharmacist**.
 
-## Getting Started
+## Default demo logins
 
-This project is a starting point for a Flutter application.
+- **Admin**: `admin@gmail.com` / `Admin@123`
+- **Doctor**: `doctor@gmail.com` / `Doctor@123`
+- **Student**: `student@gmail.com` / `Student@123`
+- **Pharmacist**: `pharma@gmail.com` / `Pharma@123`
 
-A few resources to get you started if this is your first Flutter project:
+## Run backend (Windows / PowerShell)
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```powershell
+cd backend
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver 0.0.0.0:8000
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Run Flutter (Android emulator)
+
+```powershell
+flutter run
+```
+
+## Run Flutter (physical Android phone)
+
+1. Start backend with `0.0.0.0:8000` (above).
+2. In the app, on the login screen open **Settings (⚙️)** and set:
+   - `http://<YOUR_PC_IP>:8000/api`
+
+Alternative (CLI):
+
+```powershell
+flutter run --dart-define=API_BASE_URL=http://<YOUR_PC_IP>:8000/api
+```
+
+## Dev checks
+
+```powershell
+flutter analyze
+flutter test
+```
