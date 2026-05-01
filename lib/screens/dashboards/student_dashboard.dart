@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../services/app_state.dart';
 import '../../widgets/section_title.dart';
+import '../pdf_viewer_screen.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -106,14 +107,23 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     'Updated by: ${r.updatedBy}\n'
                     'Date: ${r.date.day}/${r.date.month}/${r.date.year}',
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.download),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Report downloaded successfully')),
-                      );
-                    },
-                  ),
+                  trailing: r.pdfUrl != null
+                      ? ElevatedButton.icon(
+                          icon: const Icon(Icons.picture_as_pdf),
+                          label: const Text('View PDF'),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PdfViewerScreen(
+                                  pdfUrl: r.pdfUrl!,
+                                  reportName: 'Report_${r.id}',
+                                ),
+                              ),
+                            );
+                          },
+                        )
+                      : const Text('Processing PDF...'),
                 ),
               ),
             ),

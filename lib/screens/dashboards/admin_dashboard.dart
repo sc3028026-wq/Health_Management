@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../services/app_state.dart';
 import '../../widgets/section_title.dart';
+import '../pdf_viewer_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -206,8 +207,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   child: Icon(Icons.description_outlined, color: Color(0xFF5B5CE2)),
                 ),
                 title: Text(r.studentName),
-                subtitle: Text(r.summary),
-                trailing: Text('${r.date.day}/${r.date.month}/${r.date.year}'),
+                subtitle: Text('${r.summary}\nDate: ${r.date.day}/${r.date.month}/${r.date.year}'),
+                trailing: r.pdfUrl != null
+                    ? ElevatedButton.icon(
+                        icon: const Icon(Icons.picture_as_pdf),
+                        label: const Text('View PDF'),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PdfViewerScreen(
+                                pdfUrl: r.pdfUrl!,
+                                reportName: 'Report_${r.id}_${r.studentName}',
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : const Text('Processing PDF...'),
               ),
             ),
           ),

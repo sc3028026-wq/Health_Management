@@ -54,9 +54,9 @@ class Appointment(models.Model):
     doctor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='doctor_appointments')
     student_name = models.CharField(max_length=255)
     doctor_name = models.CharField(max_length=255)
-    date = models.DateTimeField()
+    date = models.DateTimeField(db_index=True)
     issue = models.TextField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending', db_index=True)
     deadline = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
@@ -68,7 +68,7 @@ class Diagnosis(models.Model):
     student_name = models.CharField(max_length=255)
     notes = models.TextField()
     doctor_name = models.CharField(max_length=255)
-    created_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     def __str__(self):
         return f"Diagnosis for {self.student_name}"
@@ -78,8 +78,13 @@ class MedicalReport(models.Model):
     doctor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='authored_reports')
     student_name = models.CharField(max_length=255)
     summary = models.TextField()
+    symptoms = models.TextField(blank=True)
+    diagnosis = models.TextField(blank=True)
+    prescription = models.TextField(blank=True)
+    follow_up_date = models.DateField(blank=True, null=True)
+    pdf_file = models.FileField(upload_to='reports/', null=True, blank=True)
     updated_by = models.CharField(max_length=255)
-    date = models.DateTimeField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now, db_index=True)
 
     def __str__(self):
         return f"Report for {self.student_name}"
@@ -99,7 +104,7 @@ class Prescription(models.Model):
     dosage = models.CharField(max_length=100)
     duration_days = models.PositiveIntegerField(default=1)
     instructions = models.TextField(blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     def __str__(self):
         return f"{self.student.email} - {self.medicine_name}"
@@ -133,7 +138,7 @@ class MedicineRequest(models.Model):
     message = models.TextField()
     requested_by = models.CharField(max_length=255)
     requested_at = models.DateTimeField(default=timezone.now)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending', db_index=True)
     provided_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):

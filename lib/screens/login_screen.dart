@@ -16,54 +16,14 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _hide = true;
-  final _apiController = TextEditingController();
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _apiController.dispose();
     super.dispose();
   }
 
-  Future<void> _showApiSettings() async {
-    final appState = context.read<AppState>();
-    _apiController.text = appState.resolvedApiBaseUrl;
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Backend URL'),
-        content: TextField(
-          controller: _apiController,
-          keyboardType: TextInputType.url,
-          decoration: const InputDecoration(
-            hintText: 'http://192.168.1.50:8000/api',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await appState.resetApiBaseUrlToDefault();
-              if (dialogContext.mounted) Navigator.pop(dialogContext);
-            },
-            child: const Text('Reset'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await appState.setApiBaseUrl(_apiController.text);
-              if (dialogContext.mounted) Navigator.pop(dialogContext);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -95,7 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (sbContext, setDialogState) {
             return AlertDialog(
               title: const Text('Reset Password'),
               content: SingleChildScrollView(
@@ -169,7 +129,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       : () async {
                     final email = emailCtrl.text.trim();
                     if (email.isEmpty) {
-                      ScaffoldMessenger.of(this.context).showSnackBar(
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Please enter registered email.')),
                       );
                       return;
@@ -178,24 +139,26 @@ class _LoginScreenState extends State<LoginScreen> {
                     setDialogState(() => isSubmitting = true);
 
                     String message;
+                    bool shouldPop = false;
+
                     if (!otpSent) {
-                      final result = await this.context.read<AppState>().requestPasswordResetOtp(
+                      final result = await context.read<AppState>().requestPasswordResetOtp(
                             email: email,
                           );
                       message = result['message'] as String? ?? 'Unable to send OTP.';
-                      if (result['success'] == true && mounted) {
+                      if (result['success'] == true && dialogContext.mounted) {
                         setDialogState(() {
                           otpSent = true;
                           resetSessionId = result['sessionId'] as String?;
                         });
                       }
                     } else if (!otpVerified) {
-                      message = await this.context.read<AppState>().verifyPasswordResetOtp(
+                      message = await context.read<AppState>().verifyPasswordResetOtp(
                             email: email,
                             sessionId: resetSessionId ?? '',
                             otp: otpCtrl.text.trim(),
                           );
-                      if (message.toLowerCase().contains('verified') && mounted) {
+                      if (message.toLowerCase().contains('verified') && dialogContext.mounted) {
                         setDialogState(() => otpVerified = true);
                       }
                     } else {
@@ -203,30 +166,49 @@ class _LoginScreenState extends State<LoginScreen> {
                       final confirmPassword = confirmPasswordCtrl.text.trim();
 
                       if (newPassword.isEmpty || confirmPassword.isEmpty) {
-                        setDialogState(() => isSubmitting = false);
-                        ScaffoldMessenger.of(this.context).showSnackBar(
-                          const SnackBar(content: Text('Please fill all fields.')),
-                        );
+                        if (dialogContext.mounted) setDialogState(() => isSubmitting = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please fill all fields.')),
+                          );
+                        }
                         return;
                       }
 
-                      message = await this.context.read<AppState>().resetPassword(
+                      message = await context.read<AppState>().resetPassword(
                             email: email,
                             sessionId: resetSessionId ?? '',
                             newPassword: newPassword,
                             confirmPassword: confirmPassword,
                           );
+                      if (message.toLowerCase().contains('successful')) {
+                        shouldPop = true;
+                      }
                     }
 
-                    if (!mounted || !dialogContext.mounted) return;
-                    setDialogState(() => isSubmitting = false);
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      SnackBar(content: Text(message)),
-                    );
-                    if (message.toLowerCase().contains('successful') && otpVerified) {
+                    if (!dialogContext.mounted) return;
+
+                    if (shouldPop) {
                       _emailController.text = email;
                       _passwordController.clear();
                       Navigator.pop(dialogContext);
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(message)),
+                        );
+                        final newPassword = newPasswordCtrl.text.trim();
+                        await context.read<AppState>().login(email, newPassword);
+                      }
+                      return;
+                    }
+
+                    setDialogState(() => isSubmitting = false);
+                    
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(message)),
+                      );
                     }
                   },
                   child: Text(
@@ -286,14 +268,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: IconButton(
-                          tooltip: 'Backend settings',
-                          onPressed: _showApiSettings,
-                          icon: const Icon(Icons.settings),
-                        ),
-                      ),
+
                       Container(
                         height: 58,
                         width: 58,

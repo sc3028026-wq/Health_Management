@@ -99,9 +99,19 @@ class DiagnosisSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class MedicalReportSerializer(serializers.ModelSerializer):
+    pdf_url = serializers.SerializerMethodField()
+
     class Meta:
         model = MedicalReport
         fields = '__all__'
+
+    def get_pdf_url(self, obj):
+        request = self.context.get('request')
+        if obj.pdf_file and request:
+            return request.build_absolute_uri(obj.pdf_file.url)
+        elif obj.pdf_file:
+            return obj.pdf_file.url
+        return None
 
 
 class PrescriptionSerializer(serializers.ModelSerializer):

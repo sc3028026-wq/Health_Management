@@ -12,6 +12,11 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+import os
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from io import BytesIO
+from django.core.files.base import ContentFile
 from .models import (
     User,
     StudentProfile,
@@ -318,23 +323,48 @@ class MedicalReportViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         if self.request.user.role != 'doctor':
             raise PermissionDenied('Only doctors can update reports.')
-        serializer.save(
+        report = serializer.save(
             doctor=self.request.user,
             updated_by=self.request.user.full_name,
             date=timezone.now(),
         )
+        
+        # Generate PDF
+        template_path = 'report_template.html'
+        context = {
+            'report': report,
+        }
+        template = get_template(template_path)
+        html = template.render(context)
+        
+        result = BytesIO()
+        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
+        
+        if not pdf.err:
+            file_name = f"Report_{report.id}_{report.student_name.replace(' ', '_')}.pdf"
+            report.pdf_file.save(file_name, ContentFile(result.getvalue()), save=True)
+
 
     @action(detail=True, methods=['get'])
     def download(self, request, pk=None):
         report = self.get_object()
+        pdf_url = request.build_absolute_uri(report.pdf_file.url) if report.pdf_file else None
         return Response({
             'report_id': report.id,
             'student_name': report.student_name,
             'summary': report.summary,
             'updated_by': report.updated_by,
             'date': report.date,
-            'download_url': f"/api/reports/{report.id}/download/",
+            'pdf_url': pdf_url,
+            'download_url': pdf_url,
         })
+        
+    @action(detail=True, methods=['get'])
+    def pdf(self, request, pk=None):
+        report = self.get_object()
+        if report.pdf_file:
+            return Response({'pdf_url': request.build_absolute_uri(report.pdf_file.url)})
+        return Response({'error': 'PDF not generated yet'}, status=404)
 
 
 class PrescriptionViewSet(viewsets.ModelViewSet):

@@ -137,6 +137,11 @@ class MedicalReport {
     this.id,
     required this.studentName,
     required this.summary,
+    this.symptoms = '',
+    this.diagnosis = '',
+    this.prescription = '',
+    this.followUpDate,
+    this.pdfUrl,
     required this.updatedBy,
     required this.date,
   });
@@ -144,6 +149,11 @@ class MedicalReport {
   final int? id;
   final String studentName;
   final String summary;
+  final String symptoms;
+  final String diagnosis;
+  final String prescription;
+  final DateTime? followUpDate;
+  final String? pdfUrl;
   final String updatedBy;
   final DateTime date;
 
@@ -151,15 +161,25 @@ class MedicalReport {
         'id': id,
         'studentName': studentName,
         'summary': summary,
+        'symptoms': symptoms,
+        'diagnosis': diagnosis,
+        'prescription': prescription,
+        'followUpDate': followUpDate?.toIso8601String(),
+        'pdfUrl': pdfUrl,
         'updatedBy': updatedBy,
         'date': date.toIso8601String(),
       };
 
   factory MedicalReport.fromJson(Map<String, dynamic> json) => MedicalReport(
         id: json['id'] as int?,
-        studentName: json['studentName'] as String,
-        summary: json['summary'] as String,
-        updatedBy: json['updatedBy'] as String,
+        studentName: json['studentName'] as String? ?? json['student_name'] as String? ?? '',
+        summary: json['summary'] as String? ?? '',
+        symptoms: json['symptoms'] as String? ?? '',
+        diagnosis: json['diagnosis'] as String? ?? '',
+        prescription: json['prescription'] as String? ?? '',
+        followUpDate: json['follow_up_date'] != null ? DateTime.parse(json['follow_up_date'] as String) : null,
+        pdfUrl: json['pdf_file'] as String? ?? json['pdf_url'] as String?,
+        updatedBy: json['updatedBy'] as String? ?? json['updated_by'] as String? ?? '',
         date: DateTime.parse(json['date'] as String),
       );
 }

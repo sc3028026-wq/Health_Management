@@ -15,12 +15,16 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   final _studentCtrl = TextEditingController();
   final _diagnosisCtrl = TextEditingController();
   final _reportCtrl = TextEditingController();
+  final _symptomsCtrl = TextEditingController();
+  final _prescriptionCtrl = TextEditingController();
 
   @override
   void dispose() {
     _studentCtrl.dispose();
     _diagnosisCtrl.dispose();
     _reportCtrl.dispose();
+    _symptomsCtrl.dispose();
+    _prescriptionCtrl.dispose();
     super.dispose();
   }
 
@@ -127,10 +131,20 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
             child: const Text('Add Diagnosis'),
           ),
           const SizedBox(height: 16),
-          const SectionTitle('Prescribe Medicine / Update Report'),
+          const SectionTitle('Generate Professional Report / Prescribe'),
+          TextField(
+            controller: _symptomsCtrl,
+            decoration: const InputDecoration(labelText: 'Symptoms'),
+          ),
+          const SizedBox(height: 8),
           TextField(
             controller: _reportCtrl,
-            decoration: const InputDecoration(labelText: 'Report Summary / Prescription'),
+            decoration: const InputDecoration(labelText: 'Report Summary / Findings'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _prescriptionCtrl,
+            decoration: const InputDecoration(labelText: 'Prescription / Advice'),
           ),
           const SizedBox(height: 8),
           ElevatedButton(
@@ -140,10 +154,17 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                     studentName: _studentCtrl.text,
                     summary: _reportCtrl.text,
                     updatedBy: doctor,
+                    symptoms: _symptomsCtrl.text,
+                    diagnosis: _diagnosisCtrl.text,
+                    prescription: _prescriptionCtrl.text,
+                    followUpDate: DateTime.now().add(const Duration(days: 7)), // Default 1 week
                   );
               _reportCtrl.clear();
+              _symptomsCtrl.clear();
+              _prescriptionCtrl.clear();
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report generated!')));
             },
-            child: const Text('Update Report'),
+            child: const Text('Generate PDF Report'),
           ),
           const SizedBox(height: 16),
           const SectionTitle('Current Diagnoses'),
