@@ -132,8 +132,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   Future<void> _saveToDevice() async {
     final hasPermission = await _requestStoragePermission();
+    if (!mounted) return;
+
     if (!hasPermission) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Storage permission is required to save the PDF.')),
       );
@@ -266,10 +267,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     autoSpacing: false,
                     pageFling: true,
                     onError: (error) {
-                      print(error.toString());
+                      debugPrint(error.toString());
                     },
                     onPageError: (page, error) {
-                      print('$page: ${error.toString()}');
+                      debugPrint('$page: ${error.toString()}');
                     },
                   ),
       ),

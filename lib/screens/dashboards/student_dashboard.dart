@@ -14,6 +14,7 @@ class StudentDashboard extends StatefulWidget {
 
 class _StudentDashboardState extends State<StudentDashboard> {
   final _issueCtrl = TextEditingController();
+  String? _selectedDoctor;
 
   @override
   void dispose() {
@@ -25,36 +26,41 @@ class _StudentDashboardState extends State<StudentDashboard> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final student = state.currentUser!.profile.fullName;
-    final selectedDoctor =
-        state.doctors.isNotEmpty ? state.doctors.first.profile.fullName : '';
+
     final studentAppointments = state.appointments
-        .where((a) => a.studentName == student)
+        .where((a) => a.studentName.trim() == student.trim())
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
     final studentReports = state.reports
-        .where((r) => r.studentName == student)
+        .where((r) => r.studentName.trim() == student.trim())
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
-    final studentHistory = state.activityRecords
-        .where(
-          (record) =>
-              record.actor == student ||
-              record.details.toLowerCase().contains(student.toLowerCase()),
-        )
-        .take(20)
-        .toList();
+
+    if (_selectedDoctor == null && state.doctors.isNotEmpty) {
+      _selectedDoctor = state.doctors.first.profile.fullName;
+    }
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         const SectionTitle('Book Appointment'),
-        TextFormField(
-          initialValue: selectedDoctor,
-          readOnly: true,
+        DropdownButtonFormField<String>(
+          initialValue: _selectedDoctor,
           decoration: const InputDecoration(
             labelText: 'Doctor Name',
             border: OutlineInputBorder(),
           ),
+          items: state.doctors.map((doctor) {
+            return DropdownMenuItem<String>(
+              value: doctor.profile.fullName,
+              child: Text(doctor.profile.fullName),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedDoctor = value;
+            });
+          },
         ),
         const SizedBox(height: 8),
         TextField(
@@ -67,10 +73,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
         const SizedBox(height: 8),
         ElevatedButton(
           onPressed: () async {
-            if (selectedDoctor.isEmpty || _issueCtrl.text.isEmpty) return;
+            if (_selectedDoctor == null || _issueCtrl.text.isEmpty) return;
             await context.read<AppState>().addAppointment(
                   studentName: student,
-                  doctorName: selectedDoctor,
+                  doctorName: _selectedDoctor!,
                   date: DateTime.now(),
                   issue: _issueCtrl.text,
                 );
@@ -92,6 +98,23 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 'Booked: ${a.date.day}/${a.date.month}/${a.date.year}'
                 '${a.deadline != null ? '\nDeadline: ${a.deadline!.day}/${a.deadline!.month}/${a.deadline!.year}' : ''}',
               ),
+            ),
+          ),
+        ),
+        const Divider(height: 28),
+        const SectionTitle('Current Diagnoses'),
+        if (state.diagnoses.where((d) => d.studentName.trim() == student.trim()).isEmpty)
+          const Text('No diagnoses found.'),
+        ...state.diagnoses.where((d) => d.studentName.trim() == student.trim()).map(
+          (d) => Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFDFF6FF),
+                child: Icon(Icons.note_alt, color: Color(0xFF0284C7)),
+              ),
+              title: Text('By: ${d.doctorName}'),
+              subtitle: Text(d.notes),
             ),
           ),
         ),
@@ -127,22 +150,6 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 ),
               ),
             ),
-        const Divider(height: 28),
-        const SectionTitle('Previous Activity History'),
-        if (studentHistory.isEmpty) const Text('No previous activity found yet.'),
-        ...studentHistory.map(
-          (record) => Card(
-            margin: const EdgeInsets.only(bottom: 10),
-            child: ListTile(
-              leading: const Icon(Icons.history),
-              title: Text(record.title),
-              subtitle: Text(
-                '${record.details}\n'
-                'By: ${record.actor} | ${record.createdAt.day}/${record.createdAt.month}/${record.createdAt.year}',
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }

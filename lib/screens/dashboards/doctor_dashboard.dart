@@ -12,7 +12,7 @@ class DoctorDashboard extends StatefulWidget {
 }
 
 class _DoctorDashboardState extends State<DoctorDashboard> {
-  final _studentCtrl = TextEditingController();
+  final _studentNameCtrl = TextEditingController();
   final _diagnosisCtrl = TextEditingController();
   final _reportCtrl = TextEditingController();
   final _symptomsCtrl = TextEditingController();
@@ -20,7 +20,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 
   @override
   void dispose() {
-    _studentCtrl.dispose();
+    _studentNameCtrl.dispose();
     _diagnosisCtrl.dispose();
     _reportCtrl.dispose();
     _symptomsCtrl.dispose();
@@ -83,6 +83,14 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                               ? null
                               : () async {
                                   await context.read<AppState>().acceptAppointment(a);
+                                  setState(() {
+                                    _studentNameCtrl.text = a.studentName;
+                                  });
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Appointment accepted and student selected.')),
+                                    );
+                                  }
                                 },
                           child: const Text('Accept'),
                         ),
@@ -109,8 +117,11 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
           const SizedBox(height: 8),
           const SectionTitle('View / Add Diagnosis'),
           TextField(
-            controller: _studentCtrl,
-            decoration: const InputDecoration(labelText: 'Student Name'),
+            controller: _studentNameCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Student Name',
+              border: OutlineInputBorder(),
+            ),
           ),
           const SizedBox(height: 8),
           TextField(
@@ -120,13 +131,16 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
           const SizedBox(height: 8),
           ElevatedButton(
             onPressed: () async {
-              if (_studentCtrl.text.isEmpty || _diagnosisCtrl.text.isEmpty) return;
+              if (_studentNameCtrl.text.isEmpty || _diagnosisCtrl.text.isEmpty) return;
               await context.read<AppState>().addDiagnosis(
-                    studentName: _studentCtrl.text,
+                    studentName: _studentNameCtrl.text.trim(),
                     notes: _diagnosisCtrl.text,
                     doctorName: doctor,
                   );
-              _diagnosisCtrl.clear();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Diagnosis added successfully.')),
+              );
             },
             child: const Text('Add Diagnosis'),
           ),
@@ -149,9 +163,9 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
           const SizedBox(height: 8),
           ElevatedButton(
             onPressed: () async {
-              if (_studentCtrl.text.isEmpty || _reportCtrl.text.isEmpty) return;
+              if (_studentNameCtrl.text.isEmpty || _reportCtrl.text.isEmpty) return;
               await context.read<AppState>().addOrUpdateReport(
-                    studentName: _studentCtrl.text,
+                    studentName: _studentNameCtrl.text.trim(),
                     summary: _reportCtrl.text,
                     updatedBy: doctor,
                     symptoms: _symptomsCtrl.text,
@@ -161,7 +175,9 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                   );
               _reportCtrl.clear();
               _symptomsCtrl.clear();
+              _diagnosisCtrl.clear();
               _prescriptionCtrl.clear();
+              if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report generated!')));
             },
             child: const Text('Generate PDF Report'),

@@ -11,12 +11,10 @@ import '../models/app_models.dart';
 import '../models/role.dart';
 
 class AppState extends ChangeNotifier {
+  Timer? _syncTimer;
 
 
 
-
-
-  bool _isRequesting = false;
 
   Future<http.Response> _requestWithRetry(Future<http.Response> Function() requestFn) async {
     int attempts = 0;
@@ -35,6 +33,16 @@ class AppState extends ChangeNotifier {
       await Future.delayed(Duration(seconds: 1 * attempts)); // Backoff
     }
     throw Exception("Request failed.");
+  }
+
+  List<dynamic> _extractList(String responseBody) {
+    final decoded = jsonDecode(responseBody);
+    if (decoded is Map<String, dynamic> && decoded.containsKey('results')) {
+      return decoded['results'] as List<dynamic>;
+    } else if (decoded is List) {
+      return decoded;
+    }
+    return [];
   }
 
   final List<AppUser> _users = [];
@@ -75,7 +83,17 @@ class AppState extends ChangeNotifier {
         await _persistTokens();
       }
     }
+    _startSyncTimer();
     notifyListeners();
+  }
+
+  void _startSyncTimer() {
+    _syncTimer?.cancel();
+    _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (_accessToken != null && _accessToken!.isNotEmpty) {
+        _syncCoreData();
+      }
+    });
   }
 
 
@@ -202,6 +220,7 @@ class AppState extends ChangeNotifier {
       currentUser = _userFromApi(data['user'] as Map<String, dynamic>);
       await _persistTokens();
       await _syncCoreData();
+      _startSyncTimer();
       notifyListeners();
       return true;
     } catch (_) {
@@ -220,7 +239,7 @@ class AppState extends ChangeNotifier {
           headers: _headers(auth: true),
         ));
         if (response.statusCode == 200) {
-          final data = jsonDecode(response.body) as List<dynamic>;
+          final data = _extractList(response.body);
           _users.addAll(data.map((item) => _userFromApi(item as Map<String, dynamic>)));
         }
       }
@@ -229,7 +248,7 @@ class AppState extends ChangeNotifier {
         headers: _headers(auth: true),
       ));
       if (doctorResponse.statusCode == 200) {
-        final doctorsData = jsonDecode(doctorResponse.body) as List<dynamic>;
+        final doctorsData = _extractList(doctorResponse.body);
         for (final raw in doctorsData) {
           final doctor = _userFromApi(raw as Map<String, dynamic>);
           if (_users.every((u) => u.id != doctor.id)) _users.add(doctor);
@@ -392,7 +411,7 @@ class AppState extends ChangeNotifier {
   Future<void> logout() async {
     try {
       if (_refreshToken != null) {
-        final resp = await _requestWithRetry(() => http.post(
+        await _requestWithRetry(() => http.post(
           Uri.parse('${ApiConfig.baseUrl}/users/logout/'),
           headers: _headers(auth: true),
           body: jsonEncode({'refresh': _refreshToken}),
@@ -409,6 +428,7 @@ class AppState extends ChangeNotifier {
     reports.clear();
     medicineRequests.clear();
     medicines.clear();
+    _syncTimer?.cancel();
     notifyListeners();
   }
 
@@ -419,7 +439,7 @@ class AppState extends ChangeNotifier {
     required String issue,
   }) async {
     if (_accessToken == null) return;
-    final resp = await _requestWithRetry(() => http.post(
+    await _requestWithRetry(() => http.post(
       Uri.parse('${ApiConfig.baseUrl}/appointments/'),
       headers: _headers(auth: true),
       body: jsonEncode({
@@ -434,7 +454,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> acceptAppointment(Appointment appointment) async {
     if (appointment.id == null || _accessToken == null) return;
-    final resp = await _requestWithRetry(() => http.post(
+    await _requestWithRetry(() => http.post(
       Uri.parse('${ApiConfig.baseUrl}/appointments/${appointment.id}/accept/'),
       headers: _headers(auth: true),
     ));
@@ -443,7 +463,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> setAppointmentDeadline(Appointment appointment, DateTime deadline) async {
     if (appointment.id == null || _accessToken == null) return;
-    final resp = await _requestWithRetry(() => http.post(
+    await _requestWithRetry(() => http.post(
       Uri.parse('${ApiConfig.baseUrl}/appointments/${appointment.id}/set_deadline/'),
       headers: _headers(auth: true),
       body: jsonEncode({'deadline': deadline.toIso8601String()}),
@@ -457,7 +477,7 @@ class AppState extends ChangeNotifier {
     required String doctorName,
   }) async {
     if (_accessToken == null) return;
-    final resp = await _requestWithRetry(() => http.post(
+    await _requestWithRetry(() => http.post(
       Uri.parse('${ApiConfig.baseUrl}/diagnoses/'),
       headers: _headers(auth: true),
       body: jsonEncode({
@@ -479,7 +499,7 @@ class AppState extends ChangeNotifier {
     DateTime? followUpDate,
   }) async {
     if (_accessToken == null) return;
-    final resp = await _requestWithRetry(() => http.post(
+    await _requestWithRetry(() => http.post(
       Uri.parse('${ApiConfig.baseUrl}/reports/'),
       headers: _headers(auth: true),
       body: jsonEncode({
@@ -497,7 +517,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> addMedicine(String name, int stock) async {
     if (_accessToken == null) return;
-    final resp = await _requestWithRetry(() => http.post(
+    await _requestWithRetry(() => http.post(
       Uri.parse('${ApiConfig.baseUrl}/medicines/add_stock/'),
       headers: _headers(auth: true),
       body: jsonEncode({'name': name.trim(), 'stock': stock}),
@@ -557,7 +577,7 @@ class AppState extends ChangeNotifier {
   Future<void> provideMedicineRequest(MedicineRequest request) async {
     if (request.id == null || _accessToken == null) return;
     try {
-      final resp = await _requestWithRetry(() => http.post(
+      await _requestWithRetry(() => http.post(
         Uri.parse('${ApiConfig.baseUrl}/medicine-requests/${request.id}/provide/'),
         headers: _headers(auth: true),
       ));
@@ -575,7 +595,7 @@ class AppState extends ChangeNotifier {
       ));
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+        final List<dynamic> data = _extractList(response.body);
         final serverRequests = data
             .map(
               (item) => MedicineRequest(
@@ -609,7 +629,7 @@ class AppState extends ChangeNotifier {
         headers: _headers(auth: true),
       ));
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List<dynamic>;
+        final data = _extractList(response.body);
         appointments
           ..clear()
           ..addAll(data.map((item) => _appointmentFromApi(item as Map<String, dynamic>)));
@@ -626,7 +646,7 @@ class AppState extends ChangeNotifier {
         headers: _headers(auth: true),
       ));
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List<dynamic>;
+        final data = _extractList(response.body);
         diagnoses
           ..clear()
           ..addAll(data.map((item) => _diagnosisFromApi(item as Map<String, dynamic>)));
@@ -643,7 +663,7 @@ class AppState extends ChangeNotifier {
         headers: _headers(auth: true),
       ));
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List<dynamic>;
+        final data = _extractList(response.body);
         reports
           ..clear()
           ..addAll(data.map((item) => _reportFromApi(item as Map<String, dynamic>)));
@@ -660,7 +680,7 @@ class AppState extends ChangeNotifier {
         headers: _headers(auth: true),
       ));
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List<dynamic>;
+        final data = _extractList(response.body);
         medicines
           ..clear()
           ..addAll(data.map((item) => _medicineFromApi(item as Map<String, dynamic>)));

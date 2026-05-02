@@ -13,17 +13,21 @@ class PharmacistDashboard extends StatefulWidget {
 
 class _PharmacistDashboardState extends State<PharmacistDashboard> {
   final _medicineCtrl = TextEditingController();
-  final _issueMedicineCtrl = TextEditingController();
+  String? _selectedIssueMedicine;
   final _stockCtrl = TextEditingController();
   final _issueQtyCtrl = TextEditingController();
+  
+  final _refillMedicineNameCtrl = TextEditingController();
+  final _refillQtyCtrl = TextEditingController();
   final _requestMsgCtrl = TextEditingController();
 
   @override
   void dispose() {
     _medicineCtrl.dispose();
-    _issueMedicineCtrl.dispose();
     _stockCtrl.dispose();
     _issueQtyCtrl.dispose();
+    _refillMedicineNameCtrl.dispose();
+    _refillQtyCtrl.dispose();
     _requestMsgCtrl.dispose();
     super.dispose();
   }
@@ -85,27 +89,35 @@ class _PharmacistDashboardState extends State<PharmacistDashboard> {
             ),
           ),
           const SizedBox(height: 14),
-          const SectionTitle('Issue Medicine + Notify Admin'),
-          TextField(
-            controller: _issueMedicineCtrl,
-            decoration: const InputDecoration(labelText: 'Medicine Name'),
+          const SectionTitle('Issue Medicine to Student'),
+          DropdownButtonFormField<String>(
+            initialValue: _selectedIssueMedicine,
+            decoration: const InputDecoration(
+              labelText: 'Medicine Name',
+              border: OutlineInputBorder(),
+            ),
+            items: state.medicines.map((medicine) {
+              return DropdownMenuItem<String>(
+                value: medicine.name,
+                child: Text(medicine.name),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedIssueMedicine = value;
+              });
+            },
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _issueQtyCtrl,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Issue Quantity'),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _requestMsgCtrl,
-            maxLines: 3,
-            decoration: const InputDecoration(labelText: 'Message for Admin (if stock refill is needed)'),
+            decoration: const InputDecoration(labelText: 'Issue Quantity(For Patient)'),
           ),
           const SizedBox(height: 8),
           ElevatedButton(
             onPressed: () async {
-              final medicineName = _issueMedicineCtrl.text.trim();
+              final medicineName = _selectedIssueMedicine ?? '';
               final qty = int.tryParse(_issueQtyCtrl.text);
               if (medicineName.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -125,14 +137,39 @@ class _PharmacistDashboardState extends State<PharmacistDashboard> {
                   );
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+              if (msg.toLowerCase().contains('success')) {
+                _issueQtyCtrl.clear();
+              }
             },
             child: const Text('Issue Medicine'),
+          ),
+
+          const SizedBox(height: 14),
+          const SectionTitle('Request Refill from Admin'),
+          TextField(
+            controller: _refillMedicineNameCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Medicine Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _refillQtyCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Refill Quantity Needed'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _requestMsgCtrl,
+            maxLines: 3,
+            decoration: const InputDecoration(labelText: 'Message for Admin'),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () async {
-              final medicineName = _issueMedicineCtrl.text.trim();
-              final qty = int.tryParse(_issueQtyCtrl.text);
+              final medicineName = _refillMedicineNameCtrl.text.trim();
+              final qty = int.tryParse(_refillQtyCtrl.text);
               final adminMessage = _requestMsgCtrl.text.trim();
               if (medicineName.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -162,11 +199,37 @@ class _PharmacistDashboardState extends State<PharmacistDashboard> {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
               if (msg.toLowerCase().contains('saved') ||
                   msg.toLowerCase().contains('successfully')) {
+                _refillMedicineNameCtrl.clear();
+                _refillQtyCtrl.clear();
                 _requestMsgCtrl.clear();
               }
             },
             icon: const Icon(Icons.send),
             label: const Text('Send Refill Request to Admin'),
+          ),
+          const SizedBox(height: 14),
+          const SectionTitle('My Refill Requests'),
+          if (state.medicineRequests.isEmpty)
+            const Text('No refill requests sent.'),
+          ...state.medicineRequests.map(
+            (req) => Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: (req.status == 'Provided' ? Colors.green : Colors.orange).withValues(alpha: 0.15),
+                  child: Icon(
+                    req.status == 'Provided' ? Icons.check_circle : Icons.pending,
+                    color: req.status == 'Provided' ? Colors.green : Colors.orange,
+                  ),
+                ),
+                title: Text('${req.medicineName} - Qty ${req.requestedQty}'),
+                subtitle: Text('Status: ${req.status}\nMessage: ${req.message}'),
+                trailing: Text(
+                  req.requestedAt.day.toString() + '/' + req.requestedAt.month.toString() + '/' + req.requestedAt.year.toString(),
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ),
+            ),
           ),
         ],
       ),

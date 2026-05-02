@@ -177,25 +177,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
           const SizedBox(height: 8),
-          const SectionTitle('System Activity Records'),
-          if (state.activityRecords.isEmpty) const Text('No activity records yet.'),
-          ...state.activityRecords.take(25).map(
-            (record) => Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              child: ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFE0E7FF),
-                  child: Icon(Icons.history, color: Color(0xFF5B5CE2)),
-                ),
-                title: Text(record.title),
-                subtitle: Text(
-                  '${record.details}\n'
-                  'By: ${record.actor} | ${record.createdAt.day}/${record.createdAt.month}/${record.createdAt.year}',
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
           const SectionTitle('View Reports'),
           if (state.reports.isEmpty) const Text('No reports added yet.'),
           ...state.reports.map(
